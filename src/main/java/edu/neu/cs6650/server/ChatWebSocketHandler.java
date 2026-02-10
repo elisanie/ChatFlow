@@ -85,13 +85,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private String validate(ChatMessage chat, String connectionRoomId) {
-//        Generate 500,000 chat messages total with random data:
-//        userId: random between 1-100000
-//        username: generate from userId (e.g., "user12345")
-//        message: random from a pool of 50 pre-defined messages
-//        roomId: random between 1-20
-//        messageType: 90% TEXT, 5% JOIN, 5% LEAVE
-//        timestamp: current time
+//        userId must be between 1 and 100000
+//        username must be 3-20 alphanumeric characters
+//        message must be 1-500 characters
+//        timestamp must be valid ISO-8601
+//        messageType must be one of the specified values
+
         try {
             int id = Integer.parseInt(chat.getUserId());
             if (id < 1 || id > 100000) {
