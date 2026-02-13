@@ -60,8 +60,43 @@ public class WarmupPhase {
                         //convert to JSON
                         String json = mapper.writeValueAsString(msg);
 
-                        client.sendAndWait(json);
+                        boolean success = false;
+                        int maxRetries = 5;
 
+                        for (int attempt = 0; attempt < maxRetries; attempt++) {
+
+                            // ensure connection is usable; reconnect if needed
+                            if (client == null || !client.isOpen()) {
+                                if (client != null) {
+                                    try { client.close(); } catch (Exception ignore) {}
+                                }
+                                client = new ChatWebSocketClient(SERVER_URL, roomId);
+
+                                if (!client.connectAndWait()) {
+                                    if (attempt < maxRetries - 1) {
+                                        Thread.sleep((1L << attempt) * 1000L);
+                                    }
+                                    continue;
+                                }
+                                metrics.recordReconnection();
+                            }
+
+                            try {
+                                success = client.sendAndWait(json);
+                                if (success) break;
+                            } catch (Exception e) {
+                                // ignore and retry
+                            }
+
+                            if (attempt < maxRetries - 1) {
+                                Thread.sleep((1L << attempt) * 1000L); // 1s, 2s, 4s, 8s, 16s
+                            }
+                        }
+
+                        // Warmup no record latency
+                        if (!success) {
+                            System.err.println("Warmup: send failed after retries (room " + roomId + ")");
+                        }
                     }
                 } catch (Exception e) {
                     System.err.println("Warm-up thread error: " + e.getMessage());
@@ -74,9 +109,5 @@ public class WarmupPhase {
 
         latch.await();
         System.out.println("Warm-up phase complete.");
-
     }
-
-
 }
-

@@ -35,5 +35,9 @@ public class LoadTestClient {
 
         // Step 4: results
         metrics.printResults();
+
+        CalAndStatsExport export = new CalAndStatsExport(metrics.getLatencyRecords());
+        export.printStats();
+        export.writeCsv("results.csv");
     }
 }

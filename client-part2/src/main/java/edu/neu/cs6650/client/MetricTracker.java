@@ -1,5 +1,10 @@
 package edu.neu.cs6650.client;
 
+import edu.neu.cs6650.client.model.LatencyRecord;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MetricTracker {
@@ -10,6 +15,8 @@ public class MetricTracker {
     private final AtomicInteger failCount = new AtomicInteger(0);
     private final AtomicInteger totalConnections = new AtomicInteger(0);
     private final AtomicInteger reconnections = new AtomicInteger(0);
+    //no lock, performance for concurrency
+    private final ConcurrentLinkedQueue<LatencyRecord> latencyRecords = new ConcurrentLinkedQueue<>();
     private long startTime;
     private long endTime;
 
@@ -35,6 +42,14 @@ public class MetricTracker {
 
     public void recordReconnection() {
         reconnections.incrementAndGet();
+    }
+
+    public void recordLatency(LatencyRecord record) {
+        latencyRecords.add(record);
+    }
+
+    public List<LatencyRecord> getLatencyRecords() {
+        return new ArrayList<>(latencyRecords);
     }
 
     public void printResults() {

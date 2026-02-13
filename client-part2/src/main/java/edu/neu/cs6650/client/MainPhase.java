@@ -2,6 +2,7 @@ package edu.neu.cs6650.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.neu.cs6650.client.model.ChatMessage;
+import edu.neu.cs6650.client.model.LatencyRecord;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -12,7 +13,7 @@ public class MainPhase {
 //    Continue until all 500K messages are sent
 //    Threads should maintain persistent WebSocket connections where possible
     private static final int THREADS = 100;
-//    private static final String SERVER_URL = "ws://localhost:8080";
+    //    private static final String SERVER_URL = "ws://localhost:8080";
     private static final String SERVER_URL = "ws://35.92.170.243:8080";
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -38,7 +39,7 @@ public class MainPhase {
                     // every client has a individual connection
                     client = new ChatWebSocketClient(SERVER_URL, roomId);
                     if (!client.connectAndWait()) {
-                        System.err.println("Warmup: connection failed for room " + roomId);
+                        System.err.println("Main: connection failed for room " + roomId);
                         return;
                     }
 
@@ -55,8 +56,50 @@ public class MainPhase {
                         //convert to JSON
                         String json = mapper.writeValueAsString(msg);
 
-                        if (client.sendAndWait(json)) {
+                        boolean success = false;
+                        long attemptStart = 0;
+                        long attemptEnd = 0;
+                        int maxRetries = 5;
+
+                        for (int attempt = 0; attempt < maxRetries; attempt++) {
+                            // ensure connection is usable
+                            if (client == null || !client.isOpen()) {
+                                if (client != null) {
+                                    try { client.close(); } catch (Exception ignore) {}
+                                }
+                                client = new ChatWebSocketClient(SERVER_URL, roomId);
+                                if (!client.connectAndWait()) {
+                                    if (attempt < maxRetries - 1) {
+                                        Thread.sleep((1L << attempt) * 1000L);
+                                    }
+                                    continue;
+                                }
+                                metrics.recordReconnection();
+                            }
+
+                            try {
+                                attemptStart = System.nanoTime();
+                                success = client.sendAndWait(json);
+                                attemptEnd = System.nanoTime();
+                                if (success) break;
+                            } catch (Exception e) {
+                                attemptEnd = System.nanoTime();
+                            }
+
+                            if (attempt < maxRetries - 1) {
+                                Thread.sleep((1L << attempt) * 1000L);
+                            }
+                        }
+
+                        if (success) {
                             metrics.recordSuccess();
+                            metrics.recordLatency(new LatencyRecord(
+                                    attemptStart,
+                                    attemptEnd,
+                                    msg.getMessageType(),
+                                    msg.getRoomId(), // use msg roomId for consistency
+                                    200
+                            ));
                         } else {
                             metrics.recordFail();
                         }
