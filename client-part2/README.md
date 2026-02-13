@@ -1,4 +1,4 @@
-# ChatFlow Client Part 2
+# Client Part 2
 
 Load testing client with latency analysis and statistics.
 
