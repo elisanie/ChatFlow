@@ -7,18 +7,23 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public class MainPhase {
-//    After initial threads complete, you're free to create optimal thread configuration
-//    Continue until all 500K messages are sent
-//    Threads should maintain persistent WebSocket connections where possible
-    private static final int THREADS = 100;
+public class WarmupPhase {
+//    Create 32 threads at startup
+//    Each thread establishes a WebSocket connection
+//    Each thread sends 1000 messages then terminates
+//    Measure this phase separately as "warmup"
+
+
+    //use to generate 32 threads and await till all done
+    private static final int THREADS = 32;
+    private static final int MESSAGES_PER_THREAD = 1000;
     private static final String SERVER_URL = "ws://localhost:8080";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final LinkedBlockingQueue<ChatMessage> queue;
     private final MetricTracker metrics;
 
-    public MainPhase(LinkedBlockingQueue<ChatMessage> queue, MetricTracker metrics) {
+    public WarmupPhase(LinkedBlockingQueue<ChatMessage> queue, MetricTracker metrics) {
         this.queue = queue;
         this.metrics = metrics;
     }
@@ -44,10 +49,10 @@ public class MainPhase {
                     //connection --> metrics
                     metrics.recordConnection();
 
-                    while (true) {
+                    //0 -1000
+                    for (int j = 0; j < MESSAGES_PER_THREAD; j++) {
                         ChatMessage msg = queue.poll(2, TimeUnit.SECONDS);
                         if (msg == null) break;
-
 
                         //msg's roomid == connection's roomid
                         msg.setRoomId(roomId);
@@ -58,11 +63,14 @@ public class MainPhase {
                         int maxRetries = 5;
 
                         for (int attempt = 0; attempt < maxRetries; attempt++) {
+
+                            // ensure connection is usable; reconnect if needed
                             if (client == null || !client.isOpen()) {
                                 if (client != null) {
                                     try { client.close(); } catch (Exception ignore) {}
                                 }
                                 client = new ChatWebSocketClient(SERVER_URL, roomId);
+
                                 if (!client.connectAndWait()) {
                                     if (attempt < maxRetries - 1) {
                                         Thread.sleep((1L << attempt) * 1000L);
@@ -76,22 +84,21 @@ public class MainPhase {
                                 success = client.sendAndWait(json);
                                 if (success) break;
                             } catch (Exception e) {
-                                // connection issue
+                                // ignore and retry
                             }
 
                             if (attempt < maxRetries - 1) {
-                                Thread.sleep((1L << attempt) * 1000L);
+                                Thread.sleep((1L << attempt) * 1000L); // 1s, 2s, 4s, 8s, 16s
                             }
                         }
 
-                        if (success) {
-                            metrics.recordSuccess();
-                        } else {
-                            metrics.recordFail();
+                        // Warmup no record latency
+                        if (!success) {
+                            System.err.println("Warmup: send failed after retries (room " + roomId + ")");
                         }
                     }
                 } catch (Exception e) {
-                    System.err.println("Main thread error: " + e.getMessage());
+                    System.err.println("Warm-up thread error: " + e.getMessage());
                 } finally {
                     if (client != null) client.close();
                     latch.countDown();
@@ -100,6 +107,6 @@ public class MainPhase {
         }
 
         latch.await();
-        System.out.println("Main phase complete.");
+        System.out.println("Warm-up phase complete.");
     }
 }

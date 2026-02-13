@@ -59,11 +59,37 @@ public class WarmupPhase {
                         //convert to JSON
                         String json = mapper.writeValueAsString(msg);
 
-                        client.sendAndWait(json);
 
+                        int maxRetries = 5;
+                        for (int attempt = 0; attempt < maxRetries; attempt++) {
+                            if (client == null || !client.isOpen()) {
+                                if (client != null) {
+                                    try { client.close(); } catch (Exception ignore) {}
+                                }
+                                client = new ChatWebSocketClient(SERVER_URL, roomId);
+                                if (!client.connectAndWait()) {
+                                    if (attempt < maxRetries - 1) {
+                                        Thread.sleep((1L << attempt) * 1000L);
+                                    }
+                                    continue;
+                                }
+                                metrics.recordReconnection();
+                            }
+
+                            try {
+                                boolean ok = client.sendAndWait(json);
+                                if (ok) break;
+                            } catch (Exception e) {
+                                // connection issue
+                            }
+
+                            if (attempt < maxRetries - 1) {
+                                Thread.sleep((1L << attempt) * 1000L);
+                            }
+                        }
                     }
                 } catch (Exception e) {
-                    System.err.println("Warm-up thread error: " + e.getMessage());
+                    System.err.println("Warmup thread error: " + e.getMessage());
                 } finally {
                     if (client != null) client.close();
                     latch.countDown();
@@ -73,9 +99,5 @@ public class WarmupPhase {
 
         latch.await();
         System.out.println("Warm-up phase complete.");
-
     }
-
-
 }
-

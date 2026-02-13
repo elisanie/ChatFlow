@@ -2,6 +2,7 @@ package edu.neu.cs6650.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.neu.cs6650.client.model.ChatMessage;
+import edu.neu.cs6650.client.model.LatencyRecord;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -37,7 +38,7 @@ public class MainPhase {
                     // every client has a individual connection
                     client = new ChatWebSocketClient(SERVER_URL, roomId);
                     if (!client.connectAndWait()) {
-                        System.err.println("Warmup: connection failed for room " + roomId);
+                        System.err.println("Main: connection failed for room " + roomId);
                         return;
                     }
 
@@ -55,9 +56,12 @@ public class MainPhase {
                         String json = mapper.writeValueAsString(msg);
 
                         boolean success = false;
+                        long attemptStart = 0;
+                        long attemptEnd = 0;
                         int maxRetries = 5;
 
                         for (int attempt = 0; attempt < maxRetries; attempt++) {
+                            // ensure connection is usable
                             if (client == null || !client.isOpen()) {
                                 if (client != null) {
                                     try { client.close(); } catch (Exception ignore) {}
@@ -73,10 +77,12 @@ public class MainPhase {
                             }
 
                             try {
+                                attemptStart = System.nanoTime();
                                 success = client.sendAndWait(json);
+                                attemptEnd = System.nanoTime();
                                 if (success) break;
                             } catch (Exception e) {
-                                // connection issue
+                                attemptEnd = System.nanoTime();
                             }
 
                             if (attempt < maxRetries - 1) {
@@ -86,6 +92,13 @@ public class MainPhase {
 
                         if (success) {
                             metrics.recordSuccess();
+                            metrics.recordLatency(new LatencyRecord(
+                                    attemptStart,
+                                    attemptEnd,
+                                    msg.getMessageType(),
+                                    msg.getRoomId(), // use msg roomId for consistency
+                                    200
+                            ));
                         } else {
                             metrics.recordFail();
                         }
@@ -99,7 +112,14 @@ public class MainPhase {
             }).start();
         }
 
+
         latch.await();
         System.out.println("Main phase complete.");
+
     }
+
+
+
+
+
 }
