@@ -14,8 +14,10 @@ A WebSocket-based chat server with a multithreaded load-testing client developed
 ## Server
 
 ### Requirements
-- Java 17+
-- Maven
+- Java 17+ (`java -version` to verify)
+- Maven (`mvn -v` to verify)
+    - macOS: `brew install maven`
+    - Linux: `sudo apt install maven` or `sudo yum install maven`
 
 ### Running Locally
 ```bash

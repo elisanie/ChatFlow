@@ -17,8 +17,12 @@ public class WarmupPhase {
     //use to generate 32 threads and await till all done
     private static final int THREADS = 32;
     private static final int MESSAGES_PER_THREAD = 1000;
-    //    private static final String SERVER_URL = "ws://localhost:8080";
-    private static final String SERVER_URL = "ws://35.92.170.243:8080";
+
+    //local
+        private static final String SERVER_URL = "ws://localhost:8080";
+
+    //ec2 link
+//    private static final String SERVER_URL = "ws://35.92.170.243:8080";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final LinkedBlockingQueue<ChatMessage> queue;

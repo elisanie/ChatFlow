@@ -12,8 +12,12 @@ public class MainPhase {
 //    Continue until all 500K messages are sent
 //    Threads should maintain persistent WebSocket connections where possible
     private static final int THREADS = 100;
-//    private static final String SERVER_URL = "ws://localhost:8080";
-    private static final String SERVER_URL = "ws://35.92.170.243:8080";
+
+    //local
+        private static final String SERVER_URL = "ws://localhost:8080";
+
+    //ec2 link
+//    private static final String SERVER_URL = "ws://35.92.170.243:8080";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final LinkedBlockingQueue<ChatMessage> queue;
