@@ -16,10 +16,12 @@ Server starts on port 8080.
 - WebSocket: `ws://localhost:8080/chat/{roomId}`
 - Health: `GET http://localhost:8080/health`
 
-## EC2 Deployment
+### EC2 Deployment
 ```bash
 mvn clean package -DskipTests
 scp -i key.pem target/*.jar ec2-user@<IP>:~/server.jar
 # On EC2:
+sudo yum install -y java-17-amazon-corretto-headless
 nohup java -jar server.jar &
 ```
+Ensure EC2 Security Group allows inbound TCP on port 8080.
