@@ -43,15 +43,12 @@ WebSocket endpoint on EC2: `ws://<EC2-IP>:8080/chat/{roomId}`
 ## Client Part 1 (Basic Load Test)
 
 ### Requirements
-- Java 17+
-- Maven
-- Server running on port 8080
+- Server running on port 8080 if you want to test it locally
 
 ### Running
 ```bash
 cd client-part1
-mvn clean package -DskipTests
-java -cp target/client-part1-0.0.1-SNAPSHOT.jar edu.neu.cs6650.client.LoadTestClient
+mvn compile exec:java -Dexec.mainClass="edu.neu.cs6650.client.LoadTestClient"
 ```
 
 ### Configuration
@@ -63,22 +60,23 @@ Edit `SERVER_URL` in `WarmupPhase.java` and `MainPhase.java` to point to your se
 ## Client Part 2 (With Performance Analysis)
 
 ### Requirements
-- Java 17+
-- Maven
 - Python 3 with matplotlib (for chart)
-- Server running on port 8080
+- Server running on port 8080 if you want to test it locally
 
 ### Running
 ```bash
 cd client-part2
-mvn clean package -DskipTests
-java -cp target/client-part2-0.0.1-SNAPSHOT.jar edu.neu.cs6650.client.LoadTestClient
+mvn compile exec:java -Dexec.mainClass="edu.neu.cs6650.client.LoadTestClient"
 ```
+
+
 
 ### Generate Chart
 ```bash
+pip3 install matplotlib
 python3 plot.py
 ```
+
 
 ### Configuration
 Edit `SERVER_URL` in `WarmupPhase.java` and `MainPhase.java` to point to your server.
