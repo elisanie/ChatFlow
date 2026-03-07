@@ -9,11 +9,24 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    //updates for assignment 2:
+    private final ChatWebSocketHandler handler;
+
+    // Spring auto input component
+    public WebSocketConfig(ChatWebSocketHandler handler) {
+        this.handler = handler;
+    }
+
+
     //any websocket req connect to /chat/roomid, give to ChatWebSocketHandler
     //long term connnect give pth to handler obj
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(new ChatWebSocketHandler(), "/chat/{roomId}")
+
+//        registry.addHandler(new ChatWebSocketHandler(), "/chat/{roomId}")
+        registry.addHandler(handler, "/chat/{roomId}")
                 .setAllowedOrigins("*");
     }
+
+    //updates done
 }

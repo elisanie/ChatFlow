@@ -1,5 +1,6 @@
 package edu.neu.cs6650.server;
 
+import edu.neu.cs6650.server.messageQueue.RabbitMQPublisher;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -7,8 +8,10 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
@@ -19,6 +22,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final Set<String> VALID_TYPES = Set.of("TEXT", "JOIN", "LEAVE");
 
+    //update for assignemnt 2:
+    private final RabbitMQPublisher publisher;
+    // server instances will have a random 8 size id, for monitor purpose
+    private final String serverId = UUID.randomUUID().toString().substring(0, 8);
+
+    public ChatWebSocketHandler(RabbitMQPublisher publisher) {
+        //decouple
+        this.publisher = publisher;
+    }
+    //updates done
 
     //3 way handshake, connect
     @Override
@@ -61,18 +74,44 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(new TextMessage(mapper.writeValueAsString(errResponse)));
 
             }else {
-                //echo if no err
-                Map<String, Object> successResponse = Map.of(
-                        "userId", chat.getUserId(),
-                        "username", chat.getUsername(),
-                        "message", chat.getMessage(),
-                        "timestamp", chat.getTimestamp(),
-                        "messageType", chat.getMessageType(),
-                        "roomId", chat.getRoomId(),
+
+                //updates for assignment 2:
+                // validate success, ready for queue msg
+                //get ip : tracking client ip
+                String clientIp = "unknown";
+                if (session.getRemoteAddress() != null && session.getRemoteAddress().getAddress() != null) {
+                    clientIp = session.getRemoteAddress().getAddress().getHostAddress();
+                }
+
+                Map<String, Object> queueMessage = new LinkedHashMap<>();
+                queueMessage.put("messageId", UUID.randomUUID().toString());
+                queueMessage.put("roomId", chat.getRoomId());
+                queueMessage.put("userId", chat.getUserId());
+                queueMessage.put("username", chat.getUsername());
+                queueMessage.put("message", chat.getMessage());
+                queueMessage.put("timestamp", Instant.now().toString());
+                queueMessage.put("messageType", chat.getMessageType());
+                queueMessage.put("serverId", serverId);
+                queueMessage.put("clientIp", clientIp);
+
+                //send back to server ACK
+                Map<String, Object> ack = Map.of(
                         "status", "OK",
                         "serverTimestamp", Instant.now().toString()
                 );
-                session.sendMessage(new TextMessage(mapper.writeValueAsString(successResponse)));
+
+                // publish fail handle individually
+                try {
+                    publisher.publishToRoom(chat.getRoomId(), mapper.writeValueAsString(queueMessage));
+                    session.sendMessage(new TextMessage(mapper.writeValueAsString(ack)));
+                } catch (Exception ex) {
+                    Map<String, Object> mqErr = Map.of(
+                            "status", "ERROR",
+                            "reason", "MQ_PUBLISH_FAILED"
+                    );
+                    session.sendMessage(new TextMessage(mapper.writeValueAsString(mqErr)));
+                    //updates done
+                }
             }
         } catch (Exception e) {
             Map<String, Object> errorResponse = Map.of(
