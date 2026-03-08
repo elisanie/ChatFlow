@@ -1,18 +1,22 @@
 package edu.neu.cs6650.server;
 
 import edu.neu.cs6650.server.messageQueue.RabbitMQPublisher;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
+@Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     //Jackson's json tool
@@ -27,10 +31,21 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     // server instances will have a random 8 size id, for monitor purpose
     private final String serverId = UUID.randomUUID().toString().substring(0, 8);
 
+
+    // room → all the WebSocket Session for the room
+    private final ConcurrentHashMap<String, CopyOnWriteArraySet<WebSocketSession>> roomSessions
+            = new ConcurrentHashMap<>();
+
     public ChatWebSocketHandler(RabbitMQPublisher publisher) {
         //decouple
         this.publisher = publisher;
     }
+
+    // for BroadcastController invoke
+    public ConcurrentHashMap<String, CopyOnWriteArraySet<WebSocketSession>> getRoomSessions() {
+        return roomSessions;
+    }
+
     //updates done
 
     //3 way handshake, connect
@@ -42,8 +57,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         //label this link's room id
         session.getAttributes().put("roomId", roomId);
+
+        //when the user connects join the room
+        roomSessions.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
         System.out.println("Connected: " + session.getId() + " room: " + roomId);
     }
+
+    //updates done
 
     //echo the msg
     @Override
@@ -169,6 +189,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     //break connect
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        // when user disconnects, remove them from the room
+        String roomId = (String) session.getAttributes().get("roomId");
+        if (roomId != null) {
+            CopyOnWriteArraySet<WebSocketSession> sessions = roomSessions.get(roomId);
+            if (sessions != null) sessions.remove(session);
+        }
         System.out.println("Disconnected: " + session.getId());
     }
 }
