@@ -1,4 +1,4 @@
-# CS6650 Assignment 1 – ChatFlow
+# CS6650 Assignment 2 – ChatFlow
 
 A WebSocket-based chat server with a multithreaded load-testing client developed for CS6650 Assignment 1.
 
