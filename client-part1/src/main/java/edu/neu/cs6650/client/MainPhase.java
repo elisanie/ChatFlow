@@ -14,7 +14,7 @@ public class MainPhase {
     private static final int THREADS = 100;
 
     //local
-        private static final String SERVER_URL = "ws://localhost:8080";
+        private static final String SERVER_URL = "ws://52.38.141.112:8080";
 
     //ec2 link
 //    private static final String SERVER_URL = "ws://35.92.170.243:8080";
