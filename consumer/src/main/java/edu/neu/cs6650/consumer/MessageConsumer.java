@@ -33,9 +33,13 @@ public class MessageConsumer {
     private final CountDownLatch stopLatch = new CountDownLatch(1);
     private final List<Channel> channels = new CopyOnWriteArrayList<>();
 
+    private final DBWriter dbwriter;
+
+
     public MessageConsumer(Connection connection,
                            RabbitMQProperties rabbitProps,
-                           BroadcasterProperties broadcasterProps) {
+                           BroadcasterProperties broadcasterProps,
+                            DBWriter dbwriter) {
         this.connection = connection;
         this.rabbitProps = rabbitProps;
         this.broadcasterProps = broadcasterProps;
@@ -43,6 +47,9 @@ public class MessageConsumer {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(broadcasterProps.getTimeoutMs()))
                 .build();
+
+        this.dbwriter = dbwriter;
+
     }
 
     @PostConstruct
@@ -89,12 +96,15 @@ public class MessageConsumer {
                     broadcast(body);
                 }
 
-                // 处理成功，ACK
+                dbwriter.enqueue(body);
+
+
+                // if its pass through，ACK
                 channel.basicAck(tag, false);
 
             } catch (Exception e) {
                 System.err.println("Failed to process: " + e.getMessage());
-                // requeue=true，满足 at-least-once
+                // requeue=true， for at-least-once
                 channel.basicNack(tag, false, true);
             }
         };
