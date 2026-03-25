@@ -89,12 +89,12 @@ public class MessageConsumer {
                     broadcast(body);
                 }
 
-                // 处理成功，ACK
+                // ACK
                 channel.basicAck(tag, false);
 
             } catch (Exception e) {
                 System.err.println("Failed to process: " + e.getMessage());
-                // requeue=true，满足 at-least-once
+                // requeue=true，at-least-once
                 channel.basicNack(tag, false, true);
             }
         };
