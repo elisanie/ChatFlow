@@ -32,6 +32,18 @@ public class DBWriter {
     //max waiting time for flush
     private static final int FLUSH_INTERVAL_MS = 500;
 
+    // CLOSED: normal DB writes
+    // OPEN: temporarily stop DB writes after repeated failures
+    // HALF_OPEN: allow one trial write after cooldown
+    private enum CircuitState { CLOSED, OPEN, HALF_OPEN }
+    private CircuitState circuitState = CircuitState.CLOSED;
+    private int consecutiveFailures = 0;
+    private long openUntilMillis = 0L;
+    // open the circuit after 3 consecutive failures
+    private static final int FAILURE_THRESHOLD = 3;
+    // Keep the circuit open for 10 seconds before retrying
+    private static final long OPEN_DURATION_MS = 10000; //10s
+
     //constructor auto when set up
     public DBWriter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -69,10 +81,49 @@ public class DBWriter {
                 }
 
                 //timeout or batch is full
+                // flush when batch is full, or when timeout happens and batch is not empty
                 if (batch.size() >= BATCH_SIZE || (msg == null && !batch.isEmpty())) {
-                    writeBatch(batch);
-                    //after write, clear for the next round
-                    batch.clear();
+
+                    // If circuit is OPEN, skip DB writes until cooldown ends
+                    if (circuitState == CircuitState.OPEN) {
+                        if (System.currentTimeMillis() < openUntilMillis) {
+                            System.err.println("Circuit OPEN - skipping DB write");
+                            batch.clear();
+                            continue;
+                        } else {
+                            // cooldown ended, allow one trial write
+                            circuitState = CircuitState.HALF_OPEN;
+                            System.out.println("Circuit HALF_OPEN - trying DB again");
+                        }
+                    }
+
+                    try {
+                        writeBatch(batch);
+
+                        // success resets consecutive failure count
+                        consecutiveFailures = 0;
+
+                        // if a trial write succeeds, close the circuit
+                        if (circuitState == CircuitState.HALF_OPEN) {
+                            circuitState = CircuitState.CLOSED;
+                            System.out.println("Circuit CLOSED - DB recovered");
+                        }
+
+                    } catch (Exception e) {
+                        consecutiveFailures++;
+                        System.err.println("DB write failed: " + e.getMessage());
+
+                        // open circuit after repeated failures
+                        if (consecutiveFailures >= FAILURE_THRESHOLD) {
+                            circuitState = CircuitState.OPEN;
+                            openUntilMillis = System.currentTimeMillis() + OPEN_DURATION_MS;
+                            System.err.println("Circuit OPEN - too many failures, pausing DB writes for "
+                                    + OPEN_DURATION_MS + " ms");
+                        }
+                    } finally {
+                        // always clear batch after this flush attempt
+                        batch.clear();
+                    }
                 }
 
             } catch (InterruptedException e) {
@@ -118,9 +169,17 @@ public class DBWriter {
 
         // when there's data then batch insert
         if (!params.isEmpty()) {
-            jdbcTemplate.batchUpdate(sql, params);
-            System.out.println("Wrote batch of " + params.size());
-            updateUserRoomActivity(messages);
+            try {
+                jdbcTemplate.batchUpdate(sql, params);
+                System.out.println("Wrote batch of " + params.size());
+
+                // update aggregated per-user per-room activity only after batch insert succeeds
+                updateUserRoomActivity(messages);
+
+            } catch (Exception e) {
+                // rethrow DB exceptions so the circuit breaker logic in batchWriteLoop can see failures
+                throw new RuntimeException("Failed to write batch to database", e);
+            }
 
         }
     }
