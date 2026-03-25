@@ -7,7 +7,11 @@ import java.net.http.HttpResponse;
 
 public class MetricsAPICaller {
     //for switch between local and aws ec2
-    private static final String METRICS_URL = "http://localhost:8080/metrics";
+//    private static final String METRICS_URL = "http://localhost:8080/metrics";
+
+    //alb
+    private static final String METRICS_URL = "http://chatflow-alb-308077375.us-west-2.elb.amazonaws.com/metrics";
+
 
     public static void call() {
         try {

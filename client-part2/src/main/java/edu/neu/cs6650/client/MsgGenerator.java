@@ -10,7 +10,7 @@ public class MsgGenerator implements Runnable {
     // Single dedicated thread generates all messages
     // Generate 500,000 chat messages total with random data
     // message: random from a pool of 50 pre-defined messages
-    private static final int TOTAL_MSGS = 500000;
+    private static final int TOTAL_MSGS = 3000000;
     private static final String[] MSG_POOL = {
             "The legend of Hyrule never gets old",
             "Time to explore Hyrule again",
