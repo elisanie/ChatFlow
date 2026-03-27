@@ -28,7 +28,7 @@ public class DBWriter {
     // avoid every msg a new variable
     private final ObjectMapper objectMapper = new ObjectMapper();
     //max batch size for now
-    private static final int BATCH_SIZE = 500;
+    private static final int BATCH_SIZE = 1000;
     //max waiting time for flush
     private static final int FLUSH_INTERVAL_MS = 500;
 
