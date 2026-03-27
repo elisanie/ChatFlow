@@ -111,6 +111,11 @@ public class DBWriter {
 
                     } catch (Exception e) {
                         consecutiveFailures++;
+
+                        long backoffMs = (long) Math.pow(2, Math.min(consecutiveFailures, 6)) * 100;
+                        System.err.println("Retrying after backoff: " + backoffMs + "ms");
+                        Thread.sleep(backoffMs);
+
                         System.err.println("DB write failed: " + e.getMessage());
 
                         // open circuit after repeated failures
